@@ -1,14 +1,19 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
+pub mod error;
+mod core;
 
 #[cfg(test)]
 mod tests {
+    use std::panic;
+
     use super::*;
 
     #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+    fn test_init(){
+        let address = core::wallet::Wallet::init("F:/Dev/Web3/libs/spark_core", "Clemenflo").unwrap();
+
+        println!("{}", address);
+
+        core::database::WalletDatabase::delete("F:/Dev/Web3/libs/spark_core/data_storage");
     }
+    
 }
