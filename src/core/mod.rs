@@ -1,4 +1,4 @@
 pub mod wallet;
 pub mod database;
-mod address;
+pub mod address;
 mod crypto;
