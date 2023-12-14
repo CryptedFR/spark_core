@@ -27,10 +27,19 @@ trait Generator {
     fn encode_address(address: [u8; 29]) -> String;
 }
 
+trait Checker {
+    fn verify(address: String) -> Result<bool, bs58::decode::Error>;
+    fn prefixed_hash_checkum_checker(prefixed_hash: &[u8]) -> [u8; 8];
+}
+
 // New function implementation for address generator
 impl Address {
     pub fn new(public_key: &[u8]) -> String {
         <Address as Generator>::new(public_key)
+    }
+
+    pub fn verify(address: String) -> Result<bool, bs58::decode::Error> {
+        <Address as Checker>::verify(address)
     }
 }
 
@@ -48,8 +57,8 @@ impl Generator for Address{
         let pk_ripmed_hash: [u8; 20] = Self::hash_ripemd160_pk(pk_hash);
         let prefixed_ripemd_hash: [u8; 21] = Self::add_network_prefix(pk_ripmed_hash);
         let checksum: [u8; 8] = Self::double_hash_ripmed_network_prefix(prefixed_ripemd_hash);
-        let built_address = Self::build_address(prefixed_ripemd_hash, checksum);
-        let address = Self::encode_address(built_address);
+        let built_address: [u8; 29] = Self::build_address(prefixed_ripemd_hash, checksum);
+        let address: String = Self::encode_address(built_address);
         address
     }
 
@@ -105,10 +114,66 @@ impl Generator for Address{
     }
 }
 
+impl Checker for Address {
+    fn verify(address: String) -> Result<bool, bs58::decode::Error>{
+        let decoded_address = bs58::decode(address).into_vec()?;
+        let prefixed_hash = &decoded_address[..21];
+        let checksum = &decoded_address[21..];
+
+        let recalculated_checksum = Self::prefixed_hash_checkum_checker(prefixed_hash);
+
+        if checksum != recalculated_checksum {
+            return Ok(false)
+        }
+
+        Ok(true)
+    }
+
+    fn prefixed_hash_checkum_checker(prefixed_hash: &[u8]) -> [u8; 8] {
+        let mut hasher = Sha256::new();
+        hasher.update(prefixed_hash);
+        let first_hash = hasher.finalize();
+
+        let mut hasher = Sha256::new();
+        hasher.update(first_hash);
+        let hash = hasher.finalize();
+        
+        let mut checksum: [u8; 8] = [0u8; 8];
+        checksum.copy_from_slice(&hash[0..8]);
+        checksum
+    }
+}
+
 // Unit testing
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_verify_address() {
+        // Valid address
+        let address = String::from("1LgpjGES36zGcyH5kRy9Kh3EL1DRwZhZCuPAa1c");
+
+        let result = Address::verify(address);
+        
+        assert!(result.is_ok());
+
+        let check: bool = result.unwrap();
+
+        assert_eq!(check, true);
+
+        // Invalid address
+        let address = String::from("9LgpjGES36zGcyH5kRy9Kh3EL1DRwZhZCuPAa1c");
+
+        let result = Address::verify(address);
+        
+        assert!(result.is_ok());
+
+        let check: bool = result.unwrap();
+
+        assert_eq!(check, false);
+
+    }
 
     #[test]
     fn test_hash_sha256_public_key_type() {
